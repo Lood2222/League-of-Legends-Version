@@ -53,11 +53,6 @@
       background: radial-gradient(ellipse at 50% 60%, #0b1e3a22, #060a12);
     }
 
-    /*
-      map-inner: fixed pixel size computed in JS so it's always 2:1
-      and fits inside the available area. Both children fill it 100x100%,
-      so they share the exact same coordinate space — no misalignment on resize.
-    */
     .map-inner {
       position: relative;
       flex-shrink: 0;
@@ -74,11 +69,6 @@
       pointer-events: none;
     }
 
-    /*
-      SVG overlay with preserveAspectRatio="none":
-      viewBox 0 0 1000 500 maps exactly onto the div's pixels.
-      Pins at (x,y) always land on the same map pixel regardless of window size.
-    */
     .pins-layer {
       position: absolute;
       inset: 0;
@@ -100,10 +90,12 @@
     .sdot {
       width: 6px; height: 6px; border-radius: 50%;
       background: #2a9d4f; box-shadow: 0 0 6px #2a9d4f;
-      animation: pulse 2s ease infinite;
     }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-    .ver-loading { animation: pulse 1s ease infinite; }
+    .sdot.loading { animation: pulse 1s ease infinite; background: #c89b3c; box-shadow: 0 0 6px #c89b3c; }
+
+    /* Version-changed flash: applied via JS on the SVG text element's parent group */
+    @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes newpatch { 0%{opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{opacity:0} }
   </style>
 </head>
 <body>
@@ -115,19 +107,10 @@
 <div class="map-outer" id="outer">
   <div class="map-inner" id="mapinner">
 
-    <!-- Equirectangular world map (native 2:1 ratio matches our projection formula) -->
     <img class="world-img"
          src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/2000px-World_map_-_low_resolution.svg.png"
          alt=""/>
 
-    <!--
-      viewBox="0 0 1000 500" + preserveAspectRatio="none":
-      SVG unit (x, y) → pixel (x/1000·W, y/500·H).
-
-      Pin positions use equirectangular projection:
-        x = (lng + 180) / 360 × 1000
-        y = (90 − lat) / 180 × 500
-    -->
     <svg class="pins-layer"
          viewBox="0 0 1000 500"
          preserveAspectRatio="none"
@@ -142,83 +125,77 @@
           <feGaussianBlur stdDeviation="1.2" result="b"/>
           <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
+        <filter id="glow-gold" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
 
-      <!-- Latitude grid lines -->
+      <!-- Grid -->
       <g stroke="#4a8fd1" stroke-opacity="0.08" stroke-width="0.6" stroke-dasharray="4 6">
-        <line x1="0" y1="83"  x2="1000" y2="83"/>   <!-- 60°N -->
-        <line x1="0" y1="167" x2="1000" y2="167"/>  <!-- 30°N -->
-        <line x1="0" y1="250" x2="1000" y2="250" stroke-opacity="0.15"/>  <!-- Equator -->
-        <line x1="0" y1="333" x2="1000" y2="333"/>  <!-- 30°S -->
-        <line x1="0" y1="417" x2="1000" y2="417"/>  <!-- 60°S -->
-      </g>
-      <!-- Longitude grid lines -->
-      <g stroke="#4a8fd1" stroke-opacity="0.08" stroke-width="0.6" stroke-dasharray="4 6">
-        <line x1="167" y1="0" x2="167" y2="500"/>   <!-- -120° -->
-        <line x1="333" y1="0" x2="333" y2="500"/>   <!-- -60° -->
-        <line x1="500" y1="0" x2="500" y2="500" stroke-opacity="0.15"/>   <!-- 0° -->
-        <line x1="667" y1="0" x2="667" y2="500"/>   <!-- 60°E -->
-        <line x1="833" y1="0" x2="833" y2="500"/>   <!-- 120°E -->
+        <line x1="0" y1="83"  x2="1000" y2="83"/>
+        <line x1="0" y1="167" x2="1000" y2="167"/>
+        <line x1="0" y1="250" x2="1000" y2="250" stroke-opacity="0.15"/>
+        <line x1="0" y1="333" x2="1000" y2="333"/>
+        <line x1="0" y1="417" x2="1000" y2="417"/>
+        <line x1="167" y1="0" x2="167" y2="500"/>
+        <line x1="333" y1="0" x2="333" y2="500"/>
+        <line x1="500" y1="0" x2="500" y2="500" stroke-opacity="0.15"/>
+        <line x1="667" y1="0" x2="667" y2="500"/>
+        <line x1="833" y1="0" x2="833" y2="500"/>
       </g>
 
-      <!-- Markers injected by JS -->
       <g id="markers"></g>
-
     </svg>
   </div>
 </div>
 
 <footer>
-  <div class="sdot"></div>
+  <div class="sdot" id="sdot"></div>
   <span id="status-text">Cargando versiones…</span>
-  <span style="margin-left:auto" id="last-updated"></span>
+  <span style="margin-left:auto;color:#2a4a3a" id="next-refresh"></span>
+  <span style="margin-left:16px" id="last-updated"></span>
 </footer>
 
 <script>
-  // ── Keep map-inner sized to 2:1, fitting the available area ─────────────
+  // ── Resize: keep map-inner at 2:1 ratio ──────────────────────────────────
   const outer = document.getElementById('outer');
   const inner = document.getElementById('mapinner');
-
   function syncSize() {
-    const maxW = outer.clientWidth;
-    const maxH = outer.clientHeight;
-    // width is constrained by either the available width or 2× the height
-    const w = Math.min(maxW, maxH * 2);
+    const w = Math.min(outer.clientWidth, outer.clientHeight * 2);
     inner.style.width  = w + 'px';
     inner.style.height = (w / 2) + 'px';
   }
   syncSize();
   window.addEventListener('resize', syncSize);
 
-  // ── Region definitions ───────────────────────────────────────────────────
-  // x = (lng + 180) / 360 * 1000
-  // y = (90 − lat) / 180 * 500
-  // Small nudges applied to EUW/EUNE, KR/JP, TR/RU to avoid card overlap.
+  // ── Region data ──────────────────────────────────────────────────────────
+  // x = (lng+180)/360*1000   y = (90-lat)/180*500
   const regions = [
-    { code: "euw",  name: "EUW",  x: 504, y: 122 }, // Frankfurt (50.1°N,  8.7°E)
-    { code: "eune", name: "EUNE", x: 572, y: 104 }, // Warsaw    (52.2°N, 21.0°E)
-    { code: "na",   name: "NA",   x: 257, y: 132 }, // Chicago   (41.9°N, 87.6°W)
-    { code: "kr",   name: "KR",   x: 830, y: 140 }, // Seoul     (37.6°N,127.0°E)
-    { code: "jp",   name: "JP",   x: 900, y: 158 }, // Tokyo     (35.7°N,139.7°E)
-    { code: "br",   name: "BR",   x: 371, y: 315 }, // São Paulo (23.6°S, 46.6°W)
-    { code: "lan",  name: "LAN",  x: 224, y: 196 }, // Mex. City (19.4°N, 99.1°W)
-    { code: "las",  name: "LAS",  x: 336, y: 348 }, // Bs. Aires (34.6°S, 58.4°W)
-    { code: "oce",  name: "OCE",  x: 922, y: 345 }, // Sydney    (33.9°S,151.2°E)
-    { code: "tr",   name: "TR",   x: 581, y: 142 }, // Istanbul  (41.0°N, 29.0°E)
-    { code: "ru",   name: "RU",   x: 619, y: 94  }, // Moscow    (55.8°N, 37.6°E)
+    { code: "euw",  name: "EUW",  x: 504, y: 122 },
+    { code: "eune", name: "EUNE", x: 572, y: 104 },
+    { code: "na",   name: "NA",   x: 257, y: 132 },
+    { code: "kr",   name: "KR",   x: 830, y: 140 },
+    { code: "jp",   name: "JP",   x: 900, y: 158 },
+    { code: "br",   name: "BR",   x: 371, y: 315 },
+    { code: "lan",  name: "LAN",  x: 224, y: 196 },
+    { code: "las",  name: "LAS",  x: 336, y: 348 },
+    { code: "oce",  name: "OCE",  x: 922, y: 345 },
+    { code: "tr",   name: "TR",   x: 581, y: 142 },
+    { code: "ru",   name: "RU",   x: 619, y: 94  },
   ];
 
-  // ── SVG card dimensions (in viewBox units = SVG units) ──────────────────
   const CW = 58, CH = 32, STEM = 10;
 
+  // ── Build SVG pin card ───────────────────────────────────────────────────
   function makeMarker(r) {
     const { x: cx, y: cy, name, code } = r;
     const rx = cx - CW / 2;
     const ry = cy - CH - STEM;
-
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const g  = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('id', `pin-${code}`);
     g.innerHTML = `
-      <rect x="${rx}" y="${ry}" width="${CW}" height="${CH}" rx="3"
+      <rect id="bg-${code}" x="${rx}" y="${ry}" width="${CW}" height="${CH}" rx="3"
             fill="#090f1e" fill-opacity="0.92" stroke="#1e3050" stroke-width="0.8"/>
       <line x1="${rx+8}" y1="${ry}" x2="${rx+CW-8}" y2="${ry}"
             stroke="#c89b3c" stroke-width="0.9" stroke-opacity="0.9"/>
@@ -228,47 +205,131 @@
       <text x="${cx}" y="${ry+23}" text-anchor="middle" dominant-baseline="middle"
             font-family="Rajdhani,sans-serif" font-size="10" font-weight="600"
             fill="#4cafef" filter="url(#glow-s)"
-            id="ver-${code}" class="ver-loading">…</text>
+            id="ver-${code}">…</text>
       <line x1="${cx}" y1="${cy-STEM}" x2="${cx}" y2="${cy-3.5}"
             stroke="#c89b3c" stroke-width="0.7" stroke-opacity="0.55"/>
       <circle cx="${cx}" cy="${cy}" r="3.2" fill="#4cafef" filter="url(#glow)"/>
+      <!-- "NEW" badge, hidden by default -->
+      <rect id="newbadge-${code}" x="${rx+CW-18}" y="${ry-7}" width="20" height="9" rx="2"
+            fill="#c89b3c" opacity="0" filter="url(#glow-gold)"/>
+      <text id="newlabel-${code}" x="${rx+CW-8}" y="${ry-2.5}" text-anchor="middle" dominant-baseline="middle"
+            font-family="Orbitron,sans-serif" font-size="4.5" font-weight="900"
+            fill="#060a12" opacity="0">NEW</text>
     `;
     return g;
   }
 
-  // ── Fetch versions in parallel ───────────────────────────────────────────
+  // ── Flash animation when a version changes ───────────────────────────────
+  function flashNewVersion(code) {
+    // Border glow
+    const bg = document.getElementById(`bg-${code}`);
+    if (bg) {
+      bg.setAttribute('stroke', '#c89b3c');
+      bg.setAttribute('stroke-width', '1.5');
+      setTimeout(() => {
+        bg.setAttribute('stroke', '#1e3050');
+        bg.setAttribute('stroke-width', '0.8');
+      }, 8000);
+    }
+    // "NEW" badge: fade in, hold, fade out
+    ['newbadge', 'newlabel'].forEach(prefix => {
+      const el = document.getElementById(`${prefix}-${code}`);
+      if (!el) return;
+      el.setAttribute('opacity', '1');
+      setTimeout(() => el.setAttribute('opacity', '0'), 8000);
+    });
+  }
+
+  // ── Fetch one region ─────────────────────────────────────────────────────
   async function getVersion(code) {
-    const res = await fetch(`https://ddragon.leagueoflegends.com/realms/${code}.json`);
+    // Cache-bust so the browser doesn't return a stale response
+    const res = await fetch(
+      `https://ddragon.leagueoflegends.com/realms/${code}.json?_=${Date.now()}`
+    );
+    if (!res.ok) throw new Error(res.status);
     return (await res.json()).v;
   }
 
-  async function init() {
-    const markersG  = document.getElementById('markers');
-    const statusEl  = document.getElementById('status-text');
+  // ── State: current known versions ────────────────────────────────────────
+  const known = {};   // code → version string
 
-    // Render all pins immediately with loading placeholder
-    regions.forEach(r => markersG.appendChild(makeMarker(r)));
+  // ── Refresh all regions ──────────────────────────────────────────────────
+  async function refresh(isFirst = false) {
+    const sdot     = document.getElementById('sdot');
+    const statusEl = document.getElementById('status-text');
 
-    let done = 0;
+    sdot.classList.add('loading');
+    if (!isFirst) statusEl.textContent = 'Comprobando versiones…';
+
+    let updated = 0, errors = 0, done = 0;
+
     await Promise.all(regions.map(async r => {
       try {
         const v  = await getVersion(r.code);
         const el = document.getElementById(`ver-${r.code}`);
-        if (el) { el.textContent = v; el.classList.remove('ver-loading'); }
-      } catch {
-        const el = document.getElementById(`ver-${r.code}`);
         if (el) {
-          el.textContent = 'N/A';
-          el.classList.remove('ver-loading');
-          el.setAttribute('fill', '#e05050');
+          const changed = known[r.code] && known[r.code] !== v;
+          if (changed) {
+            flashNewVersion(r.code);
+            updated++;
+          }
+          known[r.code] = v;
+          el.textContent = v;
+          el.setAttribute('fill', '#4cafef'); // reset in case of previous error
         }
+      } catch {
+        errors++;
+        const el = document.getElementById(`ver-${r.code}`);
+        if (el) el.setAttribute('fill', '#e05050');
       }
-      statusEl.textContent = `Cargando… ${++done}/${regions.length}`;
+      done++;
+      if (isFirst) statusEl.textContent = `Cargando… ${done}/${regions.length}`;
     }));
 
-    statusEl.textContent = `${regions.length} regiones cargadas`;
+    sdot.classList.remove('loading');
+
+    if (isFirst) {
+      statusEl.textContent = `${regions.length} regiones cargadas`;
+    } else if (updated > 0) {
+      statusEl.textContent = `¡${updated} región${updated > 1 ? 'es' : ''} actualizada${updated > 1 ? 's' : ''}!`;
+    } else {
+      statusEl.textContent = errors > 0
+        ? `${errors} error${errors > 1 ? 'es' : ''} de red`
+        : 'Sin cambios de versión';
+    }
+
     document.getElementById('last-updated').textContent =
-      'Actualizado ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      'Última comprobación: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Countdown ticker in footer ───────────────────────────────────────────
+  const REFRESH_MS = 20 * 60 * 1000; // 20 minutes
+  let nextRefreshAt = Date.now() + REFRESH_MS;
+
+  function startCountdown() {
+    const el = document.getElementById('next-refresh');
+    setInterval(() => {
+      const secs = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+      const m = String(Math.floor(secs / 60)).padStart(2, '0');
+      const s = String(secs % 60).padStart(2, '0');
+      el.textContent = `Próxima comprobación: ${m}:${s}`;
+    }, 1000);
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function init() {
+    const markersG = document.getElementById('markers');
+    regions.forEach(r => markersG.appendChild(makeMarker(r)));
+
+    // First load
+    await refresh(true);
+
+    // Auto-refresh every 5 minutes
+    startCountdown();
+    setInterval(async () => {
+      nextRefreshAt = Date.now() + REFRESH_MS;
+      await refresh(false);
+    }, REFRESH_MS);
   }
 
   init();
