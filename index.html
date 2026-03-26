@@ -51,19 +51,16 @@
       background: radial-gradient(ellipse at 50% 60%, #0b1e3a18, #060a12);
     }
 
-    /* The SVG fills the outer div entirely — D3 handles the projection */
     #map-svg {
       width: 100%;
       height: 100%;
       display: block;
     }
 
-    /* Land & borders */
-    .land    { fill: #1a2a3a; stroke: #2a4060; stroke-width: 0.4; }
-    .borders { fill: none;    stroke: #111d2d; stroke-width: 0.3; }
+    .land     { fill: #1a2a3a; stroke: #2a4060; stroke-width: 0.4; }
+    .borders  { fill: none;    stroke: #111d2d; stroke-width: 0.3; }
     .graticule { fill: none; stroke: #4a8fd1; stroke-opacity: 0.07; stroke-width: 0.5; }
 
-    /* Pin cards are foreignObject → HTML inside SVG */
     .pin-card {
       background: #090f1eeb;
       border: 1px solid #1e3050;
@@ -73,7 +70,6 @@
       min-width: 58px;
       position: relative;
       overflow: visible;
-      backdrop-filter: blur(4px);
     }
     .pin-card::before {
       content: '';
@@ -139,113 +135,125 @@
 </footer>
 
 <script>
-  // ── Region definitions: real server datacenter coordinates ────────────────
+  // ── Region definitions ────────────────────────────────────────────────────
+  // offset: {dx, dy} desplazamiento de la tarjeta respecto al punto en px.
+  // Sin offset → línea recta hacia arriba (comportamiento por defecto).
+  // Con offset → línea quebrada al punto cardinal indicado.
   const regions = [
-    { code: "euw",  name: "EUW",  lng:   8.68, lat: 50.11 }, // Frankfurt
-    { code: "eune", name: "EUNE", lng:  18.07, lat: 52.23 }, // Warsaw
-    { code: "na",   name: "NA",   lng: -87.63, lat: 41.88 }, // Chicago
-    { code: "kr",   name: "KR",   lng: 126.97, lat: 37.56 }, // Seoul
-    { code: "jp",   name: "JP",   lng: 139.69, lat: 35.68 }, // Tokyo
-    { code: "br",   name: "BR",   lng: -46.63, lat: -23.55 }, // São Paulo
-    { code: "lan",  name: "LAN",  lng: -99.13, lat: 19.43 }, // Mexico City
-    { code: "las",  name: "LAS",  lng: -58.38, lat: -34.60 }, // Buenos Aires
-    { code: "oce",  name: "OCE",  lng: 151.20, lat: -33.86 }, // Sydney
-    { code: "tr",   name: "TR",   lng:  32.86, lat: 39.93 }, // Ankara
-    { code: "ru",   name: "RU",   lng:  37.61, lat: 55.75 }, // Moscow
+    { code: "euw",  name: "EUW",  lng:   8.68, lat: 50.11, offset: { dx: -75, dy: -70 } }, // Frankfurt → arriba-izquierda
+    { code: "eune", name: "EUNE", lng:  18.07, lat: 52.23, offset: { dx:  10, dy: -80 } }, // Warsaw    → arriba
+    { code: "ru",   name: "RU",   lng:  37.61, lat: 55.75, offset: { dx:  75, dy: -70 } }, // Moscow    → arriba-derecha
+    { code: "tr",   name: "TR",   lng:  32.86, lat: 39.93 },                               // Ankara    → sin offset
+    { code: "na",   name: "NA",   lng: -87.63, lat: 41.88 },                               // Chicago
+    { code: "kr",   name: "KR",   lng: 126.97, lat: 37.56 },                               // Seoul
+    { code: "jp",   name: "JP",   lng: 139.69, lat: 35.68, offset: { dx: 55, dy: -30 } }, // Tokyo     → derecha
+    { code: "br",   name: "BR",   lng: -46.63, lat: -23.55 },                              // São Paulo
+    { code: "lan",  name: "LAN",  lng: -99.13, lat: 19.43 },                               // Mexico City
+    { code: "las",  name: "LAS",  lng: -58.38, lat: -34.60 },                              // Buenos Aires
+    { code: "oce",  name: "OCE",  lng: 151.20, lat: -33.86 },                              // Sydney
   ];
 
-  const known = {};  // code → version string
+  const known = {};
+  const CW = 66, CH = 34, DOT = 5;
 
-  // Card size in pixels (fixed — doesn't scale with map)
-  const CW = 66, CH = 34, STEM = 10, DOT = 5;
+  const svg   = d3.select('#map-svg');
+  const outer = document.getElementById('outer');
+  let projection;
 
-  const svg    = d3.select('#map-svg');
-  const outer  = document.getElementById('outer');
-  let projection, pathGen;
-
-  // ── Build / rebuild everything when window resizes ────────────────────────
+  // ── Draw map + pins ───────────────────────────────────────────────────────
   function buildMap(geo) {
     const W = outer.clientWidth;
     const H = outer.clientHeight;
 
     svg.attr('viewBox', `0 0 ${W} ${H}`);
 
-    // Equirectangular projection fitted to our SVG size
-    projection = d3.geoEquirectangular()
-      .fitSize([W, H], { type: 'Sphere' });
-
-    pathGen = d3.geoPath(projection);
+    projection = d3.geoEquirectangular().fitSize([W, H], { type: 'Sphere' });
+    const pathGen = d3.geoPath(projection);
 
     svg.selectAll('*').remove();
 
-    // Background ocean
-    svg.append('rect')
-       .attr('width', W).attr('height', H)
-       .attr('fill', '#08111e');
+    // Ocean
+    svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#08111e');
 
-    // Graticule (grid lines)
+    // Graticule
     const graticule = d3.geoGraticule().step([30, 30]);
-    svg.append('path')
-       .datum(graticule())
-       .attr('class', 'graticule')
-       .attr('d', pathGen);
+    svg.append('path').datum(graticule()).attr('class', 'graticule').attr('d', pathGen);
 
-    // Equator highlighted slightly
+    // Equator
     svg.append('path')
-       .datum({ type: 'LineString', coordinates: [[-180, 0], [180, 0]] })
-       .attr('fill', 'none')
-       .attr('stroke', '#4a8fd1')
-       .attr('stroke-opacity', 0.15)
-       .attr('stroke-width', 0.7)
-       .attr('d', pathGen);
+      .datum({ type: 'LineString', coordinates: [[-180, 0], [180, 0]] })
+      .attr('fill', 'none').attr('stroke', '#4a8fd1').attr('stroke-opacity', 0.15)
+      .attr('stroke-width', 0.7).attr('d', pathGen);
 
     // Countries
-    const countries = topojson.feature(geo, geo.objects.countries);
     svg.append('g')
-       .selectAll('path')
-       .data(countries.features)
-       .join('path')
-       .attr('class', 'land')
-       .attr('d', pathGen);
+      .selectAll('path')
+      .data(topojson.feature(geo, geo.objects.countries).features)
+      .join('path').attr('class', 'land').attr('d', pathGen);
 
-    // Country borders
+    // Borders
     svg.append('path')
-       .datum(topojson.mesh(geo, geo.objects.countries, (a, b) => a !== b))
-       .attr('class', 'borders')
-       .attr('d', pathGen);
+      .datum(topojson.mesh(geo, geo.objects.countries, (a, b) => a !== b))
+      .attr('class', 'borders').attr('d', pathGen);
 
-    // ── Pins ──────────────────────────────────────────────────────────────
+    // ── Pins ─────────────────────────────────────────────────────────────
     const pinsG = svg.append('g').attr('id', 'pins');
 
     regions.forEach(r => {
       const [px, py] = projection([r.lng, r.lat]);
+      const dx = r.offset?.dx ?? 0;
+      const dy = r.offset?.dy ?? -(DOT + 10 + CH); // default: straight up
 
-      const g = pinsG.append('g')
-        .attr('id', `pin-${r.code}`)
-        .attr('transform', `translate(${px},${py})`);
+      // Card anchor point (bottom-centre of the card)
+      const cardCX = px + dx;                       // centre-x of card
+      const cardBY = py + dy;                        // top of card + CH = bottom of card
+      // where the line meets the card bottom edge:
+      const lineEndX = cardCX;
+      const lineEndY = cardBY + CH;
 
-      // Stem
-      g.append('line')
-        .attr('x1', 0).attr('y1', -DOT)
-        .attr('x2', 0).attr('y2', -(DOT + STEM))
-        .attr('stroke', '#c89b3c').attr('stroke-width', 0.8).attr('stroke-opacity', 0.6);
+      const g = pinsG.append('g').attr('id', `pin-${r.code}`);
 
-      // Card via foreignObject so we can use HTML/CSS for text rendering
+      // Leader line: dot → elbow → card bottom
+      if (r.offset) {
+        // Two-segment polyline for offset cards
+        const elbowY = py - DOT - 6; // short vertical rise from dot first
+        g.append('polyline')
+          .attr('points', `${px},${py - DOT} ${px},${elbowY} ${lineEndX},${lineEndY}`)
+          .attr('fill', 'none')
+          .attr('stroke', '#c89b3c')
+          .attr('stroke-width', 0.8)
+          .attr('stroke-opacity', 0.55)
+          .attr('stroke-dasharray', '3 2');
+        // Small circle at elbow joint
+        g.append('circle')
+          .attr('cx', px).attr('cy', elbowY)
+          .attr('r', 1.2)
+          .attr('fill', '#c89b3c').attr('fill-opacity', 0.5);
+      } else {
+        // Straight vertical stem
+        g.append('line')
+          .attr('x1', px).attr('y1', py - DOT)
+          .attr('x2', lineEndX).attr('y2', lineEndY)
+          .attr('stroke', '#c89b3c').attr('stroke-width', 0.8).attr('stroke-opacity', 0.6);
+      }
+
+      // Card (foreignObject)
       const fo = g.append('foreignObject')
-        .attr('x', -CW / 2)
-        .attr('y', -(DOT + STEM + CH))
+        .attr('x', cardCX - CW / 2)
+        .attr('y', cardBY)
         .attr('width', CW)
         .attr('height', CH);
 
       const div = fo.append('xhtml:div').attr('class', 'pin-card');
       div.append('xhtml:div').attr('class', 'pin-region').text(r.name);
       div.append('xhtml:div')
-         .attr('class', 'pin-version loading')
-         .attr('id', `ver-${r.code}`)
-         .text('…');
+        .attr('class', 'pin-version loading')
+        .attr('id', `ver-${r.code}`)
+        .text('…');
 
-      // Dot
+      // Dot on top of everything
       g.append('circle')
+        .attr('cx', px).attr('cy', py)
         .attr('r', DOT)
         .attr('fill', '#4cafef')
         .style('filter', 'drop-shadow(0 0 4px #4cafef)');
@@ -264,19 +272,21 @@
   async function refresh(isFirst = false) {
     const sdot     = document.getElementById('sdot');
     const statusEl = document.getElementById('status-text');
-
     sdot.classList.add('loading');
     if (!isFirst) statusEl.textContent = 'Comprobando versiones…';
 
     let updated = 0, errors = 0, done = 0;
-
     await Promise.all(regions.map(async r => {
       try {
         const v  = await getVersion(r.code);
         const el = document.getElementById(`ver-${r.code}`);
         if (el) {
           const changed = known[r.code] && known[r.code] !== v;
-          if (changed) { updated++; el.classList.add('updated'); setTimeout(() => el.classList.remove('updated'), 10000); }
+          if (changed) {
+            updated++;
+            el.classList.add('updated');
+            setTimeout(() => el.classList.remove('updated'), 10000);
+          }
           known[r.code] = v;
           el.textContent = v;
           el.classList.remove('loading');
@@ -291,7 +301,6 @@
     }));
 
     sdot.classList.remove('loading');
-
     if (isFirst) {
       statusEl.textContent = `${regions.length} regiones cargadas`;
     } else if (updated > 0) {
@@ -299,7 +308,6 @@
     } else {
       statusEl.textContent = errors > 0 ? `${errors} error${errors > 1 ? 'es' : ''} de red` : 'Sin cambios de versión';
     }
-
     document.getElementById('last-updated').textContent =
       'Última comprobación: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -307,41 +315,28 @@
   // ── Countdown ─────────────────────────────────────────────────────────────
   const REFRESH_MS = 5 * 60 * 1000;
   let nextRefreshAt = Date.now() + REFRESH_MS;
-
   function startCountdown() {
     const el = document.getElementById('next-refresh');
     setInterval(() => {
       const secs = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
-      const m = String(Math.floor(secs / 60)).padStart(2, '0');
-      const s = String(secs % 60).padStart(2, '0');
-      el.textContent = `Próxima comprobación: ${m}:${s}`;
+      el.textContent = `Próxima comprobación: ${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;
     }, 1000);
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
-    const statusEl = document.getElementById('status-text');
-
-    // Load world topology
     const geo = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
     buildMap(geo);
 
-    // Rebuild on resize (debounced)
     let resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => buildMap(geo), 100);
     });
 
-    // Load versions
     await refresh(true);
-
-    // Auto-refresh
     startCountdown();
-    setInterval(async () => {
-      nextRefreshAt = Date.now() + REFRESH_MS;
-      await refresh(false);
-    }, REFRESH_MS);
+    setInterval(async () => { nextRefreshAt = Date.now() + REFRESH_MS; await refresh(false); }, REFRESH_MS);
   }
 
   init();
