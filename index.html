@@ -33,17 +33,17 @@
       position: absolute;
       bottom: -1px; left: 20%; right: 20%;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #c89b3c, transparent);
+      background: linear-gradient(90deg, transparent, #ffc107, transparent);
     }
     header h1 {
       font-family: 'Orbitron', sans-serif;
       font-size: 1.05rem;
       font-weight: 900;
       letter-spacing: .15em;
-      color: #c89b3c;
-      text-shadow: 0 0 20px #c89b3c44;
+      color: #ffc107;
+      text-shadow: 0 0 20px #ffc107, 0 0 30px #ff9800;
     }
-    header h1 span { color: #4cafef; }
+    header h1 span { color: #00d4ff; text-shadow: 0 0 15px #00d4ff; }
 
     .map-outer {
       flex: 1;
@@ -57,9 +57,9 @@
       display: block;
     }
 
-    .land     { fill: #1a2a3a; stroke: #2a4060; stroke-width: 0.4; }
-    .borders  { fill: none;    stroke: #111d2d; stroke-width: 0.3; }
-    .graticule { fill: none; stroke: #4a8fd1; stroke-opacity: 0.07; stroke-width: 0.5; }
+    .land     { fill: #0d1420; stroke: #1a3a52; stroke-width: 0.6; }
+    .borders  { fill: none;    stroke: #1a3a52; stroke-width: 0.5; stroke-opacity: 0.7; }
+    .graticule { fill: none; stroke: #1a3a5a; stroke-opacity: 0.12; stroke-width: 0.5; }
 
     .pin-card {
       background: #090f1eeb;
@@ -75,26 +75,27 @@
       content: '';
       position: absolute;
       top: 0; left: 12%; right: 12%; height: 1px;
-      background: linear-gradient(90deg, transparent, #c89b3c, transparent);
+      background: linear-gradient(90deg, transparent, #ffc107, transparent);
     }
     .pin-region {
       font-family: 'Orbitron', sans-serif;
       font-size: 6px;
       font-weight: 700;
       letter-spacing: 1.5px;
-      color: #c89b3c;
+      color: #ffc107;
+      text-shadow: 0 0 12px #ffc107, 0 0 20px #ff9800;
       line-height: 1.4;
     }
     .pin-version {
       font-family: 'Rajdhani', sans-serif;
       font-size: 11px;
       font-weight: 600;
-      color: #4cafef;
-      text-shadow: 0 0 8px #4cafef88;
+      color: #00d4ff;
+      text-shadow: 0 0 12px #00d4ff, 0 0 20px #0088ff;
       line-height: 1.3;
     }
     .pin-version.loading { animation: pulse 1s ease infinite; color: #2a3d52; text-shadow: none; }
-    .pin-version.updated { color: #c89b3c; text-shadow: 0 0 10px #c89b3caa; }
+    .pin-version.updated { color: #ffc107; text-shadow: 0 0 12px #ffc107, 0 0 20px #ff9800; }
 
     footer {
       flex-shrink: 0;
@@ -115,6 +116,72 @@
     .sdot.loading { animation: pulse 1s ease infinite; background: #c89b3c; box-shadow: 0 0 6px #c89b3c; }
 
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .country-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .country-modal.active { display: flex; }
+    .country-modal-content {
+      background: #0a1020;
+      border: 2px solid #ffc107;
+      border-radius: 8px;
+      padding: 30px;
+      max-width: 500px;
+      box-shadow: 0 0 30px #ffc10744;
+    }
+    .country-modal-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      color: #ffc107;
+      text-shadow: 0 0 12px #ffc107;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #1a3a52;
+    }
+    .country-modal-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 14px 0;
+      font-size: 1.1rem;
+    }
+    .country-modal-label {
+      color: #00d4ff;
+      font-weight: 600;
+    }
+    .country-modal-value {
+      color: #ffc107;
+      text-align: right;
+      max-width: 50%;
+    }
+    .country-modal-close {
+      margin-top: 20px;
+      padding: 12px 25px;
+      background: #ffc107;
+      color: #0a1020;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+      font-family: 'Rajdhani', sans-serif;
+      transition: all 0.2s;
+    }
+    .country-modal-close:hover {
+      background: #00d4ff;
+      box-shadow: 0 0 15px #00d4ff;
+    }
+
+    .land { cursor: pointer; transition: fill 0.2s; }
+    .land:hover { fill: #1a2a40 !important; }
   </style>
 </head>
 <body>
@@ -134,6 +201,25 @@
   <span style="margin-left:16px" id="last-updated"></span>
 </footer>
 
+<div class="country-modal" id="country-modal">
+  <div class="country-modal-content">
+    <div class="country-modal-header" id="modal-country"></div>
+    <div class="country-modal-row">
+      <span class="country-modal-label">Región:</span>
+      <span class="country-modal-value" id="modal-region">—</span>
+    </div>
+    <div class="country-modal-row">
+      <span class="country-modal-label">Hora local:</span>
+      <span class="country-modal-value" id="modal-time">—</span>
+    </div>
+    <div class="country-modal-row">
+      <span class="country-modal-label">Versión:</span>
+      <span class="country-modal-value" id="modal-version">—</span>
+    </div>
+    <button class="country-modal-close" onclick="document.getElementById('country-modal').classList.remove('active')">Cerrar</button>
+  </div>
+</div>
+
 <script>
   // ── Region definitions ────────────────────────────────────────────────────
   // offset: {dx, dy} desplazamiento de la tarjeta respecto al punto en px.
@@ -143,14 +229,14 @@
     { code: "euw",  name: "EUW",  lng:   8.68, lat: 50.11, offset: { dx: -75, dy: -70 } }, // Frankfurt → arriba-izquierda
     { code: "eune", name: "EUNE", lng:  18.07, lat: 52.23, offset: { dx:  10, dy: -80 } }, // Warsaw    → arriba
     { code: "ru",   name: "RU",   lng:  37.61, lat: 55.75, offset: { dx:  75, dy: -70 } }, // Moscow    → arriba-derecha
-    { code: "tr",   name: "TR",   lng:  32.86, lat: 39.93 },                               // Ankara    → sin offset
-    { code: "na",   name: "NA",   lng: -87.63, lat: 41.88 },                               // Chicago
-    { code: "kr",   name: "KR",   lng: 126.97, lat: 37.56 },                               // Seoul
-    { code: "jp",   name: "JP",   lng: 139.69, lat: 35.68, offset: { dx: 55, dy: -30 } }, // Tokyo     → derecha
-    { code: "br",   name: "BR",   lng: -46.63, lat: -23.55 },                              // São Paulo
-    { code: "lan",  name: "LAN",  lng: -99.13, lat: 19.43 },                               // Mexico City
-    { code: "las",  name: "LAS",  lng: -58.38, lat: -34.60 },                              // Buenos Aires
-    { code: "oce",  name: "OCE",  lng: 151.20, lat: -33.86 },                              // Sydney
+    { code: "tr",   name: "TR",   lng:  32.86, lat: 39.93, offset: { dx:  10, dy:  70 } }, // Ankara    → abajo
+    { code: "na",   name: "NA",   lng: -87.63, lat: 41.88, offset: { dx: -75, dy: -70 } }, // Chicago   → arriba-izquierda
+    { code: "kr",   name: "KR",   lng: 126.97, lat: 37.56, offset: { dx:  75, dy: -70 } }, // Seoul     → arriba-derecha
+    { code: "jp",   name: "JP",   lng: 139.69, lat: 35.68, offset: { dx:  70, dy: -70 } }, // Tokyo     → arriba-derecha
+    { code: "br",   name: "BR",   lng: -46.63, lat: -23.55, offset: { dx: -65, dy: -70 } }, // São Paulo → arriba-izquierda
+    { code: "lan",  name: "LAN",  lng: -99.13, lat: 19.43, offset: { dx:  10, dy: -80 } }, // Mexico City → arriba
+    { code: "las",  name: "LAS",  lng: -58.38, lat: -34.60, offset: { dx:  75, dy:  70 } }, // Buenos Aires → abajo-derecha
+    { code: "oce",  name: "OCE",  lng: 151.20, lat: -33.86, offset: { dx:  70, dy: -70 } }, // Sydney    → arriba-derecha
   ];
 
   const known = {};
@@ -159,6 +245,98 @@
   const svg   = d3.select('#map-svg');
   const outer = document.getElementById('outer');
   let projection;
+
+  // ── Country to Region mapping ──────────────────────────────────────────────
+  const countryToRegion = {
+    // Europe - EUW
+    '826': 'EUW', '250': 'EUW', '276': 'EUW', '724': 'EUW', '380': 'EUW', '528': 'EUW', '56': 'EUW', '40': 'EUW', '756': 'EUW', '442': 'EUW', '208': 'EUW', '752': 'EUW', '578': 'EUW', '620': 'EUW', '372': 'EUW', '300': 'EUW', '203': 'EUW', '348': 'EUW', '642': 'EUW', '191': 'EUW', '070': 'EUW', '688': 'EUW',
+    // Europe - EUNE
+    '616': 'EUNE', '804': 'EUNE', '100': 'EUNE', '008': 'EUNE', '807': 'EUNE', '705': 'EUNE', '703': 'EUNE',
+    // Russia
+    '643': 'RU',
+    // Turkey
+    '792': 'TR', '196': 'TR',
+    // NA
+    '840': 'NA', '124': 'NA', '484': 'NA',
+    // LAN
+    '320': 'LAN', '222': 'LAN', '340': 'LAN', '558': 'LAN', '188': 'LAN', '591': 'LAN',
+    // BR
+    '076': 'BR',
+    // LAS
+    '032': 'LAS', '152': 'LAS', '170': 'LAS', '218': 'LAS', '600': 'LAS', '858': 'LAS', '862': 'LAS', '604': 'LAS', '068': 'LAS',
+    // KR
+    '410': 'KR', '156': 'KR', '158': 'KR',
+    // JP
+    '392': 'JP',
+    // OCE
+    '036': 'OCE', '554': 'OCE',
+  };
+
+  // ── Timezone mapping ──────────────────────────────────────────────────────
+  const countryTimezone = {
+    // Europe - EUW
+    '826': 'Europe/London', '250': 'Europe/Paris', '276': 'Europe/Berlin', '724': 'Europe/Madrid', '380': 'Europe/Rome', '528': 'Europe/Amsterdam', '56': 'Europe/Brussels', '40': 'Europe/Vienna', '756': 'Europe/Zurich', '442': 'Europe/Luxembourg', '208': 'Europe/Copenhagen', '752': 'Europe/Stockholm', '578': 'Europe/Oslo', '620': 'Europe/Lisbon', '372': 'Europe/Dublin', '300': 'Europe/Athens', '203': 'Europe/Prague', '348': 'Europe/Budapest', '642': 'Europe/Bucharest', '191': 'Europe/Zagreb', '070': 'Europe/Sarajevo', '688': 'Europe/Belgrade',
+    // Europe - EUNE
+    '616': 'Europe/Warsaw', '804': 'Europe/Kyiv', '100': 'Europe/Sofia', '008': 'Europe/Tirane', '807': 'Europe/Skopje', '705': 'Europe/Ljubljana', '703': 'Europe/Bratislava',
+    // Russia
+    '643': 'Europe/Moscow',
+    // Turkey
+    '792': 'Europe/Istanbul', '196': 'Europe/Istanbul',
+    // NA
+    '840': 'America/Chicago', '124': 'America/Toronto', '484': 'America/Mexico_City',
+    // LAN
+    '320': 'America/Guatemala', '222': 'America/El_Salvador', '340': 'America/Tegucigalpa', '558': 'America/Managua', '188': 'America/Costa_Rica', '591': 'America/Panama',
+    // BR
+    '076': 'America/Sao_Paulo',
+    // LAS
+    '032': 'America/Argentina/Buenos_Aires', '152': 'America/Santiago', '170': 'America/Bogota', '218': 'America/Guayaquil', '600': 'America/Asuncion', '858': 'America/Montevideo', '862': 'America/Caracas', '604': 'America/Lima', '068': 'America/La_Paz',
+    // KR
+    '410': 'Asia/Seoul', '156': 'Asia/Shanghai', '158': 'Asia/Taipei',
+    // JP
+    '392': 'Asia/Tokyo',
+    // OCE
+    '036': 'Australia/Sydney', '554': 'Pacific/Auckland',
+  };
+
+  // ── Country names ──────────────────────────────────────────────────────
+  const countryNames = {
+    '826': 'Reino Unido', '250': 'Francia', '276': 'Alemania', '724': 'España', '380': 'Italia', '528': 'Países Bajos', '56': 'Bélgica', '40': 'Austria', '756': 'Suiza', '442': 'Luxemburgo', '208': 'Dinamarca', '752': 'Suecia', '578': 'Noruega', '620': 'Portugal', '372': 'Irlanda', '300': 'Grecia', '203': 'República Checa', '348': 'Hungría', '642': 'Rumania', '643': 'Eslovenia', '191': 'Croacia', '070': 'Bosnia', '688': 'Serbia',
+    '616': 'Polonia', '804': 'Ucrania', '100': 'Bulgaria', '008': 'Albania', '807': 'Macedonia',
+    '792': 'Turquía', '196': 'Chipre',
+    '840': 'Estados Unidos', '124': 'Canadá', '484': 'México',
+    '320': 'Guatemala', '222': 'El Salvador', '340': 'Honduras', '558': 'Nicaragua', '188': 'Costa Rica', '591': 'Panamá',
+    '076': 'Brasil',
+    '032': 'Argentina', '152': 'Chile', '170': 'Colombia', '218': 'Ecuador', '600': 'Paraguay', '858': 'Uruguay', '862': 'Venezuela', '604': 'Perú', '068': 'Bolivia',
+    '410': 'Corea del Sur',
+    '392': 'Japón',
+    '036': 'Australia', '554': 'Nueva Zelanda',
+    // Más países
+    '004': 'Afganistán', '024': 'Angola', '051': 'Armenia', '031': 'Azerbaiyán', '048': 'Baréin', '050': 'Bangladesh', '086': 'Brunéi', '096': 'Camboya', '116': 'China', '156': 'China', '158': 'Taiwán', '356': 'India', '360': 'Indonesia', '364': 'Irán', '368': 'Irak', '376': 'Israel', '400': 'Jordania', '398': 'Kazajistán', '414': 'Kuwait', '417': 'Kirguistán', '418': 'Laos', '422': 'Líbano', '446': 'Macao', '458': 'Malasia', '462': 'Maldivas', '496': 'Mongolia', '104': 'Myanmar', '524': 'Nepal', '408': 'Corea del Norte', '512': 'Omán', '586': 'Pakistán', '608': 'Filipinas', '634': 'Qatar', '702': 'Singapur', '764': 'Tailandia', '860': 'Uzbekistán', '704': 'Vietnam', '887': 'Yemen',
+    '012': 'Argelia', '050': 'Bangladés', '854': 'Burkina Faso', '108': 'Burundi', '120': 'Camerún', '140': 'República Centroafricana', '148': 'Chad', '174': 'Comoras', '180': 'Congo', '178': 'Congo', '262': 'Yibuti', '818': 'Egipto', '226': 'Guinea Ecuatorial', '232': 'Eritrea', '231': 'Etiopía', '266': 'Gabón', '270': 'Gambia', '288': 'Ghana', '324': 'Guinea', '328': 'Guyana', '384': 'Costa de Marfil', '404': 'Kenia', '426': 'Lesoto', '430': 'Liberia', '434': 'Libia', '450': 'Madagascar', '454': 'Malaui', '466': 'Mali', '478': 'Mauritania', '480': 'Mauricio', '175': 'Mayotte', '504': 'Marruecos', '508': 'Mozambique', '516': 'Namibia', '562': 'Níger', '566': 'Nigeria', '638': 'Reunión', '646': 'Ruanda', '678': 'Santo Tomé y Príncipe', '686': 'Senegal', '690': 'Seychelles', '694': 'Sierra Leona', '706': 'Somalia', '710': 'Sudáfrica', '729': 'Sudán', '740': 'Sudán del Sur', '834': 'Tanzania', '768': 'Togo', '788': 'Túnez', '800': 'Uganda', '894': 'Zambia', '716': 'Zimbabue',
+    '248': 'Aland', '312': 'Guadalupe', '316': 'Guam', '334': 'Islas Heard', '364': 'Irán', '368': 'Irak', '398': 'Kazajistán', '417': 'Kirguistán', '438': 'Libia', '584': 'Palestina', '663': 'San Bartolomé', '666': 'San Martín', '670': 'San Vicente', '674': 'San Marino', '682': 'Arabia Saudí', '705': 'Eslovenia', '706': 'Somalia', '710': 'Sudáfrica', '716': 'Zimbabue',
+    '010': 'Antártida', '028': 'Antigua y Barbuda', '044': 'Bahamas', '052': 'Barbados', '060': 'Bermuda', '084': 'Belice', '092': 'Islas Vírgenes Británicas', '136': 'Islas Caimán', '162': 'Isla de Navidad', '166': 'Islas Cocos', '212': 'Dominica', '214': 'República Dominicana', '238': 'Malvinas', '239': 'Georgia del Sur', '248': 'Islas Åland', '260': 'Isla Francesa', '292': 'Gibraltar', '308': 'Granada', '312': 'Guadalupe', '316': 'Guam', '324': 'Guinea', '328': 'Guyana', '332': 'Haití', '334': 'Islas Heard', '336': 'Vaticano', '344': 'Hong Kong', '492': 'Martinica', '500': 'Malvinas', '510': 'Curaçao', '534': 'Antillas Holandesas', '535': 'Caribe holandés', '540': 'Nueva Caledonia', '548': 'Vanuatu', '554': 'Nueva Zelanda', '558': 'Nicaragua', '562': 'Níger', '566': 'Nigeria', '570': 'Niue', '574': 'Norfolk', '580': 'Islas Marianas del Norte', '581': 'Polinesia Francesa', '583': 'Micronesia', '584': 'Palaos', '585': 'Islas Cook', '586': 'Pakistán', '590': 'Saint Kitts y Nevis', '591': 'Panamá', '598': 'Papúa Nueva Guinea', '600': 'Paraguay', '604': 'Perú', '607': 'San Bartolomé', '608': 'Filipinas', '612': 'Pitcairn', '630': 'Puerto Rico', '634': 'Qatar', '638': 'Reunión', '642': 'Rumania', '643': 'Rusia', '652': 'San Bartolomé', '654': 'Santa Elena', '659': 'San Cristóbal y Nieves', '660': 'Anguilla', '662': 'Santa Lucía', '666': 'San Martín', '670': 'San Vicente', '674': 'San Marino', '678': 'Santo Tomé y Príncipe', '682': 'Arabia Saudí', '686': 'Senegal', '688': 'Serbia', '690': 'Seychelles', '694': 'Sierra Leona', '702': 'Singapur', '703': 'Eslovaquia', '704': 'Vietnam', '705': 'Eslovenia', '706': 'Somalia', '710': 'Sudáfrica', '716': 'Zimbabue', '724': 'España', '728': 'Sudán', '729': 'Sudán del Sur', '732': 'Islas Turcas y Caicos', '740': 'Sudán del Sur', '744': 'Islas Turcas y Caicos', '748': 'Suazilandia', '752': 'Suecia', '756': 'Suiza', '760': 'Siria', '762': 'Tayikistán', '764': 'Tailandia', '768': 'Togo', '772': 'Tokelau', '776': 'Tonga', '780': 'Trinidad y Tobago', '784': 'Emiratos Árabes', '788': 'Túnez', '792': 'Turquía', '795': 'Turkmenistán', '796': 'Islas Turcas y Caicos', '798': 'Tuvalu', '800': 'Uganda', '804': 'Ucrania', '807': 'Macedonia', '818': 'Egipto', '826': 'Reino Unido', '831': 'Guernsey', '832': 'Jersey', '833': 'Isla de Man', '834': 'Tanzania', '840': 'Estados Unidos', '850': 'Islas Vírgenes de Estados Unidos', '854': 'Burkina Faso', '858': 'Uruguay', '860': 'Uzbekistán', '862': 'Venezuela', '876': 'Wallis y Futuna', '882': 'Samoa Occidental', '886': 'Taiwán', '887': 'Yemen', '894': 'Zambia',
+  };
+
+  // ── Timestamp tracking ────────────────────────────────────────────────────
+  const versionTimestamps = {};
+
+  function getLocalTimeForCountry(timestamp, timezone) {
+    if (!timezone) return '—';
+    try {
+      const formatter = new Intl.DateTimeFormat('es-ES', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      return formatter.format(new Date(timestamp));
+    } catch (e) {
+      return '—';
+    }
+  }
 
   // ── Draw map + pins ───────────────────────────────────────────────────────
   function buildMap(geo) {
@@ -173,7 +351,7 @@
     svg.selectAll('*').remove();
 
     // Ocean
-    svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#08111e');
+    svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#030609');
 
     // Graticule
     const graticule = d3.geoGraticule().step([30, 30]);
@@ -182,14 +360,49 @@
     // Equator
     svg.append('path')
       .datum({ type: 'LineString', coordinates: [[-180, 0], [180, 0]] })
-      .attr('fill', 'none').attr('stroke', '#4a8fd1').attr('stroke-opacity', 0.15)
+      .attr('fill', 'none').attr('stroke', '#1a3a5a').attr('stroke-opacity', 0.2)
       .attr('stroke-width', 0.7).attr('d', pathGen);
 
     // Countries
     svg.append('g')
       .selectAll('path')
       .data(topojson.feature(geo, geo.objects.countries).features)
-      .join('path').attr('class', 'land').attr('d', pathGen);
+      .join('path')
+      .attr('class', 'land')
+      .attr('d', pathGen)
+      .on('click', function(event, d) {
+        event.stopPropagation();
+        const countryId = String(d.id);
+        const region = countryToRegion[countryId] || 'Desconocida';
+        const timezone = countryTimezone[countryId];
+        const version = known[region.toLowerCase()] || 'N/A';
+        const countryName = countryNames[countryId] || `País ${countryId}`;
+        
+        let timeStr = '—';
+        if (timezone) {
+          try {
+            const formatter = new Intl.DateTimeFormat('es-ES', {
+              timeZone: timezone,
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+            timeStr = formatter.format(new Date());
+          } catch (e) {
+            timeStr = 'N/A';
+          }
+        }
+        
+        const updated = versionTimestamps[region.toLowerCase()] 
+          ? getLocalTimeForCountry(versionTimestamps[region.toLowerCase()], timezone)
+          : '—';
+        
+        document.getElementById('modal-country').textContent = countryName;
+        document.getElementById('modal-region').textContent = region;
+        document.getElementById('modal-time').textContent = timeStr;
+        document.getElementById('modal-version').textContent = version;
+        document.getElementById('country-modal').classList.add('active');
+      });
 
     // Borders
     svg.append('path')
@@ -288,6 +501,7 @@
             setTimeout(() => el.classList.remove('updated'), 10000);
           }
           known[r.code] = v;
+          versionTimestamps[r.code] = Date.now();
           el.textContent = v;
           el.classList.remove('loading');
         }
