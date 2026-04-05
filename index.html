@@ -115,6 +115,29 @@
     }
     .sdot.loading { animation: pulse 1s ease infinite; background: #c89b3c; box-shadow: 0 0 6px #c89b3c; }
 
+    .patch-notes-btn {
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #ffc107, #ff9800);
+      color: #0a1020;
+      border: none;
+      border-radius: 3px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
+      text-transform: uppercase;
+      display: inline-block;
+    }
+    .patch-notes-btn:hover {
+      background: linear-gradient(135deg, #00d4ff, #0088ff);
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+      transform: translateY(-1px);
+    }
+
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     .country-modal {
@@ -199,6 +222,7 @@
   <span id="status-text">Cargando mapa…</span>
   <span style="margin-left:auto;color:#2a4a3a" id="next-refresh"></span>
   <span style="margin-left:16px" id="last-updated"></span>
+  <a href="https://www.leagueoflegends.com/es-es/news/tags/patch-notes/" target="_blank" class="patch-notes-btn" id="patch-notes-btn">📋 Patch Notes</a>
 </footer>
 
 <div class="country-modal" id="country-modal">
@@ -489,6 +513,8 @@
     if (!isFirst) statusEl.textContent = 'Comprobando versiones…';
 
     let updated = 0, errors = 0, done = 0;
+    let latestVersion = null;
+    
     await Promise.all(regions.map(async r => {
       try {
         const v  = await getVersion(r.code);
@@ -504,6 +530,11 @@
           versionTimestamps[r.code] = Date.now();
           el.textContent = v;
           el.classList.remove('loading');
+          
+          // Guardar la versión de EUW como referencia
+          if (r.code === 'euw' && !latestVersion) {
+            latestVersion = v;
+          }
         }
       } catch {
         errors++;
@@ -513,6 +544,17 @@
       done++;
       if (isFirst) statusEl.textContent = `Cargando… ${done}/${regions.length}`;
     }));
+
+    // Actualizar el botón de patch notes con la versión actual
+    if (latestVersion) {
+      const patchBtn = document.getElementById('patch-notes-btn');
+      if (patchBtn) {
+        // Convertir "14.23.1" a "14-23-1" para la URL
+        const versionForUrl = latestVersion.replace(/\./g, '-');
+        patchBtn.href = `https://www.leagueoflegends.com/es-es/news/game-updates/patch-${versionForUrl}-notes/`;
+        patchBtn.title = `Ver notas del parche ${latestVersion}`;
+      }
+    }
 
     sdot.classList.remove('loading');
     if (isFirst) {
